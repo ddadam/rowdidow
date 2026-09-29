@@ -16,9 +16,6 @@
 package svenmeier.coxswain.rower;
 
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Environment;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -36,14 +33,10 @@ public class FileTrace implements ITrace {
     public FileTrace(Context context) throws IOException {
         File dir = Coxswain.getExternalFilesDir(context);
         dir.mkdirs();
-        dir.setReadable(true, false);
 
         File file = new File(dir, TRACE_FILE);
 
         writer = new BufferedWriter(new FileWriter(file));
-
-        // input media so file can be found via MTB
-        context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
 
     }
 

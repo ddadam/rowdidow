@@ -10,6 +10,8 @@ import android.hardware.usb.UsbManager;
 
 import java.util.Collection;
 
+import svenmeier.coxswain.util.Compat;
+
 /**
  * Created by sven on 24.10.15.
  */
@@ -26,7 +28,7 @@ public class UsbConnector extends BroadcastReceiver {
 
 		manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 
-		context.registerReceiver(this, new IntentFilter(DEVICE_CONNECT));
+		Compat.registerReceiver(context, this, new IntentFilter(DEVICE_CONNECT));
 	}
 
 	public void destroy() {
@@ -44,7 +46,9 @@ public class UsbConnector extends BroadcastReceiver {
 	 */
 	public void connect(UsbDevice device) {
 
-		PendingIntent intent = PendingIntent.getBroadcast(context, 0, new Intent(DEVICE_CONNECT), 0);
+		// the system fills in the device and the granted decision, so this must be mutable
+		PendingIntent intent = PendingIntent.getBroadcast(context, 0, new Intent(DEVICE_CONNECT),
+				Compat.mutablePendingIntentFlags(0));
 
 		manager.requestPermission(device, intent);
 		
@@ -56,7 +60,7 @@ public class UsbConnector extends BroadcastReceiver {
 
 		if (DEVICE_CONNECT.equals(action)) {
 			synchronized (this) {
-				UsbDevice device = (UsbDevice)intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+				UsbDevice device = Compat.usbDeviceExtra(intent);
 
 				if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
 					onConnected(device);
@@ -65,6 +69,16 @@ public class UsbConnector extends BroadcastReceiver {
 		}
 
 	}
+
+	/**
+	 * Callback when device was connected.
+	 *
+	 * @see #connect(UsbDevice)
+	 */
+	protected void onConnected(UsbDevice device) {
+
+	}
+}
 
 	/**
 	 * Callback when device was connected.

@@ -26,7 +26,7 @@ public class Permission extends BroadcastReceiver {
 		IntentFilter filter = new IntentFilter();
 		filter.addAction(ACTION_USB_PERMISSION);
 		filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-		context.registerReceiver(this, filter);
+		svenmeier.coxswain.util.Compat.registerReceiver(context, this, filter);
 	}
 
 	public void destroy() {
@@ -37,7 +37,7 @@ public class Permission extends BroadcastReceiver {
 	public void request(UsbDevice device) {
 		UsbManager manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 
-		manager.requestPermission(device, PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0));
+		manager.requestPermission(device, PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), svenmeier.coxswain.util.Compat.pendingIntentFlags(0)));
 	}
 
 	public void onReceive(Context context, Intent intent) {

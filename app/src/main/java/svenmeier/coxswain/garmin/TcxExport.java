@@ -2,9 +2,6 @@ package svenmeier.coxswain.garmin;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Process;
 import android.util.Log;
@@ -75,7 +72,11 @@ public class TcxExport extends Export<Workout> {
 
 			this.workout = workout;
 
-			acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+			if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+				acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+			} else {
+				onPermissionsApproved();
+			}
 		}
 
 		@Override
@@ -104,8 +105,8 @@ public class TcxExport extends Export<Workout> {
 				return;
 			}
 
-			// input media so file can be found via MTB
-			context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
+			// make file visible over USB / file browsers
+			android.media.MediaScannerConnection.scanFile(context, new String[]{file.getAbsolutePath()}, null, null);
 
 			handler.post(new Runnable() {
 				@Override

@@ -1,17 +1,12 @@
 package svenmeier.coxswain;
 
 import android.content.Context;
-import android.content.res.AssetManager;
-import android.content.res.Resources;
 import android.database.sqlite.SQLiteDatabase;
-import android.os.Environment;
 import android.widget.Toast;
 
 import java.io.File;
-import java.io.IOException;
 
 import propoid.db.Locator;
-import propoid.db.locator.FileLocator;
 import propoid.util.content.Preference;
 
 /**

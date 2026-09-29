@@ -93,7 +93,7 @@ public class UsbRower extends Rower implements Runnable {
 
                 String action = intent.getAction();
                 if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
-                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    UsbDevice device = svenmeier.coxswain.util.Compat.usbDeviceExtra(intent);
 
                     if (device.equals(UsbRower.this.device)) {
                         trace.comment(String.format("disconnected from %s", device.getDeviceName()));
@@ -103,7 +103,7 @@ public class UsbRower extends Rower implements Runnable {
                 }
             }
         };
-        context.registerReceiver(receiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED));
+        svenmeier.coxswain.util.Compat.registerReceiver(context, receiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED));
 
         if (Preference.getBoolean(context, R.string.preference_hardware_legacy).get()) {
             protocol = new Protocol3(transfer, trace);

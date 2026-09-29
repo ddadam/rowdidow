@@ -165,7 +165,7 @@ public class WorkoutActivity extends AbstractActivity implements View.OnSystemUi
 
 					BindingDialogFragment fragment = BindingDialogFragment.create(index, bindingView.getBinding());
 
-					fragment.show(getFragmentManager(), "bindingPreference");
+					fragment.show(getSupportFragmentManager(), "bindingPreference");
 
 					return true;
 				}

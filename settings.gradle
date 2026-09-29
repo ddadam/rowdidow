@@ -1,3 +1,19 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+rootProject.name = "coxswain"
 include ':app'
 include ':propoid-core'
 include ':propoid-db'
@@ -9,3 +25,4 @@ project(':propoid-db').projectDir = new File('../propoid/propoid-db')
 project(':propoid-validation').projectDir = new File('../propoid/propoid-validation')
 project(':propoid-ui').projectDir = new File('../propoid/propoid-ui')
 project(':propoid-util').projectDir = new File('../propoid/propoid-util')
+

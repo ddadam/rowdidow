@@ -17,9 +17,16 @@ public class ShareReceiver extends BroadcastReceiver
 {
     @Override
     public void onReceive(Context context, Intent intent) {
-        ComponentName componentName = intent.getParcelableExtra(EXTRA_CHOSEN_COMPONENT);
+        ComponentName componentName;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            componentName = intent.getParcelableExtra(EXTRA_CHOSEN_COMPONENT, ComponentName.class);
+        } else {
+            componentName = intent.getParcelableExtra(EXTRA_CHOSEN_COMPONENT);
+        }
 
-        Preference.getString(context, R.string.preference_export_tcx_share_package).set(componentName.getPackageName());
+        if (componentName != null) {
+            Preference.getString(context, R.string.preference_export_tcx_share_package).set(componentName.getPackageName());
+        }
     }
 
     public static Intent newIntent(Context context) {

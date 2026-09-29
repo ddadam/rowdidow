@@ -2,14 +2,14 @@ package svenmeier.coxswain.view;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.DialogFragment;
 import android.content.DialogInterface;
 import android.os.Bundle;
+
+import androidx.fragment.app.DialogFragment;
 
 import java.util.Arrays;
 import java.util.List;
 
-import svenmeier.coxswain.BuildConfig;
 import svenmeier.coxswain.R;
 
 public class BindingDialogFragment extends DialogFragment {

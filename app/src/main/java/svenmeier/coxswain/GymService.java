@@ -77,15 +77,42 @@ public class GymService extends Service implements Gym.Listener, Rower.Callback,
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
+        // when started via startForegroundService() we must go foreground
+        // immediately, even if no rowing session is started below
+        ensureForeground();
+
         if (this.rower != null) {
             endRowing();
         }
-        
-        if (!startRowing(intent)) {
+
+        if (intent == null || !startRowing(intent)) {
+            stopForeground(true);
             stopSelf();
         }
 
         return START_NOT_STICKY;
+    }
+
+    /**
+     * Show a basic notification right away; {@link Foreground} will replace it
+     * once a rower is connected.
+     */
+    private void ensureForeground() {
+        if (foreground != null) {
+            return;
+        }
+
+        Notification.Builder builder = new Notification.Builder(GymService.this)
+                .setOngoing(true)
+                .setContentText(getString(R.string.gym_notification_connecting, getString(R.string.bluetooth_rower)));
+
+        Coxswain.initNotification(GymService.this, builder, "Gym");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, builder.build(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+        } else {
+            startForeground(NOTIFICATION_ID, builder.build());
+        }
     }
 
     @Override
@@ -102,7 +129,7 @@ public class GymService extends Service implements Gym.Listener, Rower.Callback,
         } else if (intent.getBooleanExtra(CONNECTOR_MOCK, false)) {
             rower = new MockRower(this, this);
         } else {
-            rower = new UsbRower(this, (UsbDevice) intent.getParcelableExtra(CONNECTOR_USB), this);
+            rower = new UsbRower(this, (UsbDevice) svenmeier.coxswain.util.Compat.usbDeviceExtra(intent), this);
         }
 
         this.foreground = new Foreground();
@@ -222,10 +249,14 @@ public class GymService extends Service implements Gym.Listener, Rower.Callback,
             Coxswain.initNotification(GymService.this, builder, "Gym");
 
             PendingIntent intent = PendingIntent.getService(getApplicationContext(), 0,
-                    createIntent(getApplicationContext(), CONNECTOR_NONE), PendingIntent.FLAG_UPDATE_CURRENT);
+                    createIntent(getApplicationContext(), CONNECTOR_NONE), svenmeier.coxswain.util.Compat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT));
             builder.addAction(0, getString(R.string.gym_notification_disconnect),intent);
 
-            startForeground(NOTIFICATION_ID, builder.build());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, builder.build(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+            } else {
+                startForeground(NOTIFICATION_ID, builder.build());
+            }
         }
 
         public void connected() {
@@ -237,7 +268,7 @@ public class GymService extends Service implements Gym.Listener, Rower.Callback,
                 return;
             }
 
-            builder.setContentIntent(PendingIntent.getActivity(service, 1, new Intent(service, MainActivity.class), PendingIntent.FLAG_UPDATE_CURRENT));
+            builder.setContentIntent(PendingIntent.getActivity(service, 1, new Intent(service, MainActivity.class), svenmeier.coxswain.util.Compat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT)));
             builder.setContentText(text);
             builder.setProgress(0, 0, false);
             builder.setOnlyAlertOnce(true);
@@ -264,7 +295,7 @@ public class GymService extends Service implements Gym.Listener, Rower.Callback,
                 return;
             }
 
-            builder.setContentIntent(PendingIntent.getActivity(service, 1, new Intent(service, WorkoutActivity.class), PendingIntent.FLAG_UPDATE_CURRENT));
+            builder.setContentIntent(PendingIntent.getActivity(service, 1, new Intent(service, WorkoutActivity.class), svenmeier.coxswain.util.Compat.pendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT)));
             builder.setContentText(text);
             builder.setProgress(100, progress, false);
             builder.setOnlyAlertOnce(text.equals(this.text));

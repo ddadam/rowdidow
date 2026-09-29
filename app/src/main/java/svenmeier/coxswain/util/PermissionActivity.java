@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.core.app.ActivityCompat;
@@ -30,6 +31,7 @@ public class PermissionActivity extends Activity implements ActivityCompat.OnReq
 
 	@Override
 	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 		boolean granted = true;
 		for (int grantResult : grantResults) {
 			granted &= (grantResult == PackageManager.PERMISSION_GRANTED);
@@ -37,6 +39,7 @@ public class PermissionActivity extends Activity implements ActivityCompat.OnReq
 
 		Intent intent = new Intent();
 		intent.setAction(ACTION);
+		intent.setPackage(getPackageName());
 		intent.putExtra(PERMISSIONS, permissions);
 		intent.putExtra(GRANTED, granted);
 		sendBroadcast(intent);
@@ -44,7 +47,20 @@ public class PermissionActivity extends Activity implements ActivityCompat.OnReq
 		finish();
 	}
 
-	public static IntentFilter start(Context context, String[] permissions) {
+	/**
+	 * The filter for permission results, must be registered before
+	 * {@link #start(Context, String[])} so no result can be missed.
+	 */
+	public static IntentFilter filter() {
+		IntentFilter filter = new IntentFilter();
+		filter.addAction(ACTION);
+		return filter;
+	}
+
+	/**
+	 * Start requesting the given permissions; any result is broadcast using {@link #ACTION}.
+	 */
+	public static void start(Context context, String[] permissions) {
 		Intent intent = new Intent(context, PermissionActivity.class);
 
 		// required for activity started from non-activity
@@ -52,10 +68,22 @@ public class PermissionActivity extends Activity implements ActivityCompat.OnReq
 
 		intent.putExtra(PERMISSIONS, permissions);
 
-		context.startActivity(intent);
+		try {
+			context.startActivity(intent);
+		} catch (Exception backgroundStartDenied) {
+			// Android 10+ forbids background activity starts: report as rejected
+			Intent rejected = new Intent(ACTION);
+			rejected.setPackage(context.getPackageName());
+			rejected.putExtra(PERMISSIONS, permissions);
+			rejected.putExtra(GRANTED, false);
+			context.sendBroadcast(rejected);
+		}
+	}
 
-		IntentFilter filter = new IntentFilter();
-		filter.addAction(PermissionActivity.ACTION);
-		return filter;
+	public static int receiverFlags() {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+			return Context.RECEIVER_NOT_EXPORTED;
+		}
+		return 0;
 	}
 }

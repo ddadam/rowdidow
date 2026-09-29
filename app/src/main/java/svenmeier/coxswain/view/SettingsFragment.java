@@ -21,6 +21,8 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.preference.CheckBoxPreference;
 import androidx.preference.Preference;
@@ -29,19 +31,31 @@ import androidx.preference.PreferenceFragmentCompat;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 import svenmeier.coxswain.Coxswain;
-import svenmeier.coxswain.Gym;
 import svenmeier.coxswain.R;
 import svenmeier.coxswain.util.PermissionBlock;
 import svenmeier.coxswain.view.preference.ResultPreference;
 
 public class SettingsFragment extends PreferenceFragmentCompat {
 
-    private Map<ResultPreference, Integer> requestCodes = new HashMap<>();
+    private ResultPreference pendingResult;
+
+    private ActivityResultLauncher<Intent> resultLauncher;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        resultLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() != 0 && result.getData() != null && pendingResult != null) {
+                        pendingResult.onResult(result.getData());
+                    }
+                    pendingResult = null;
+                });
+    }
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -63,14 +77,19 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object o) {
                 if (Boolean.TRUE.equals(o)) {
-                    new PermissionBlock(getActivity()) {
-                        @Override
-                        protected void onPermissionsApproved() {
-                            external.setChecked(true);
-                        }
-                    }.acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                    if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+                        new PermissionBlock(getActivity()) {
+                            @Override
+                            protected void onPermissionsApproved() {
+                                external.setChecked(true);
+                            }
+                        }.acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
-                    return false;
+                        return false;
+                    } else {
+                        // scoped storage: app-specific directory needs no permission
+                        return true;
+                    }
                 }
 
                 return true;
@@ -82,14 +101,18 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             @Override
             public boolean onPreferenceChange(Preference preference, Object o) {
                 if (Boolean.TRUE.equals(o)) {
-                    new PermissionBlock(getActivity()) {
-                        @Override
-                        protected void onPermissionsApproved() {
-                            trace.setChecked(true);
-                        }
-                    }.acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                    if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+                        new PermissionBlock(getActivity()) {
+                            @Override
+                            protected void onPermissionsApproved() {
+                                trace.setChecked(true);
+                            }
+                        }.acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
-                    return false;
+                        return false;
+                    } else {
+                        return true;
+                    }
                 }
 
                 return true;
@@ -100,12 +123,16 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         log.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(Preference preference) {
-                new PermissionBlock(getActivity()) {
-                    @Override
-                    protected void onPermissionsApproved() {
-                        exportLog();
-                    }
-                }.acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+                    new PermissionBlock(getActivity()) {
+                        @Override
+                        protected void onPermissionsApproved() {
+                            exportLog();
+                        }
+                    }.acquirePermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                } else {
+                    exportLog();
+                }
                 return true;
             }
         });
@@ -131,7 +158,6 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         try {
             File dir = Coxswain.getExternalFilesDir(getContext());
             dir.mkdirs();
-            dir.setReadable(true, false);
 
             File file = new File(dir, LOG_FILE);
 
@@ -149,40 +175,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     @Override
     public boolean onPreferenceTreeClick(Preference preference) {
         if (preference instanceof ResultPreference) {
-            ResultPreference resultPreference = (ResultPreference) preference;
+            pendingResult = (ResultPreference) preference;
 
-            Intent intent = resultPreference.getRequest();
-
-            int requestCode = requestCode(resultPreference);
-            startActivityForResult(intent, requestCode);
+            resultLauncher.launch(pendingResult.getRequest());
 
             return true;
         }
 
         return super.onPreferenceTreeClick(preference);
-    }
-
-    private int requestCode(ResultPreference preference) {
-        Integer code = requestCodes.get(preference);
-        if (code == null) {
-            code = requestCodes.size();
-            requestCodes.put(preference, code);
-        }
-
-        return code;
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        if (resultCode != 0) {
-            for (Map.Entry<ResultPreference, Integer> entry : requestCodes.entrySet()) {
-                if (entry.getValue() == requestCode) {
-                    entry.getKey().onResult(intent);
-                    return;
-                }
-            }
-        }
-
-        super.onActivityResult(requestCode, resultCode, intent);
     }
 }

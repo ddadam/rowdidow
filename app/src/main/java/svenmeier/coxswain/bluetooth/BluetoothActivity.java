@@ -28,7 +28,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import propoid.ui.list.GenericRecyclerAdapter;
 import svenmeier.coxswain.R;
@@ -112,11 +111,7 @@ public class BluetoothActivity extends AppCompatActivity implements CompoundButt
 	}
 
 	private void startScanning() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			scanning = new NewScanning();
-		} else {
-			scanning = new OldScanning();
-		}
+		scanning = new NewScanning();
 		scanning.start();
 	}
 
@@ -197,47 +192,6 @@ public class BluetoothActivity extends AppCompatActivity implements CompoundButt
 		void stop();
 	}
 
-	@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
-	private class OldScanning implements BluetoothAdapter.LeScanCallback, Scanning {
-
-		private BluetoothAdapter adapter;
-
-		@Override
-		public void start() {
-			BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-			adapter = manager.getAdapter();
-
-			if (filterCheckBox.isChecked() && serviceFilter != null) {
-				adapter.startLeScan(new UUID[]{UUID.fromString(serviceFilter)}, this);
-			} else {
-				adapter.startLeScan(this);
-			}
-		}
-
-		@Override
-		public void stop() {
-			try {
-				adapter.stopLeScan(this);
-			} catch (Exception bluetoothAlreadyOff) {
-			}
-			adapter = null;
-		}
-
-		@Override
-		public synchronized void onLeScan(final BluetoothDevice device, int rssi, final byte[] scanRecord) {
-			if (adapter == null) {
-				return;
-			}
-
-			runOnUiThread(new Runnable() {
-				@Override
-				public void run() {
-					onScanned(new ScannedDevice(device.getName(), device.getAddress()));
-				}
-			});
-		}
-	}
-
 	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 	private class NewScanning extends ScanCallback implements Scanning {
 
@@ -246,14 +200,30 @@ public class BluetoothActivity extends AppCompatActivity implements CompoundButt
 		@Override
 		public void start() {
 			BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-			scanner = manager.getAdapter().getBluetoothLeScanner();
+			try {
+				scanner = manager.getAdapter().getBluetoothLeScanner();
+			} catch (SecurityException noPermission) {
+				// BLUETOOTH_SCAN was denied, no devices will be found
+				return;
+			}
+
+			if (scanner == null) {
+				// bluetooth is off, no scanner available
+				return;
+			}
 
 			List<ScanFilter> filters = new ArrayList<>();
 			if (filterCheckBox.isChecked() && serviceFilter != null) {
 				ScanFilter heartRateOnly = new ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(serviceFilter)).build();
 				filters.add(heartRateOnly);
 			}
-			scanner.startScan(filters, new ScanSettings.Builder().build(), this);
+
+			try {
+				scanner.startScan(filters, new ScanSettings.Builder().build(), this);
+			} catch (SecurityException noPermission) {
+				// BLUETOOTH_SCAN was denied, no devices will be found
+				scanner = null;
+			}
 		}
 
 		@Override
@@ -289,7 +259,7 @@ public class BluetoothActivity extends AppCompatActivity implements CompoundButt
 			filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
 			filter.addAction(LocationManager.MODE_CHANGED_ACTION);
 			filter.addAction(ACTION_CANCEL);
-			registerReceiver(this, filter);
+			svenmeier.coxswain.util.Compat.registerReceiver(BluetoothActivity.this, this, filter);
 		}
 
 		@Override

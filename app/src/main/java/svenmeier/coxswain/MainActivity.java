@@ -19,15 +19,17 @@ import android.content.Intent;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentStatePagerAdapter;
@@ -38,6 +40,7 @@ import com.google.android.material.tabs.TabLayout;
 
 import svenmeier.coxswain.gym.Program;
 import svenmeier.coxswain.io.ImportIntention;
+import svenmeier.coxswain.util.Compat;
 import svenmeier.coxswain.view.PerformanceFragment;
 import svenmeier.coxswain.view.ProgramsFragment;
 import svenmeier.coxswain.view.WorkoutsFragment;
@@ -46,8 +49,6 @@ import svenmeier.coxswain.view.WorkoutsFragment;
 public class MainActivity extends AbstractActivity {
 
     public static String TAG = "coxswain";
-
-    private static final int REQUEST_IMPORT = 42;
 
     private Gym gym;
 
@@ -63,11 +64,19 @@ public class MainActivity extends AbstractActivity {
 
     private Gym.Listener listener;
 
+    private ActivityResultLauncher<Intent> importLauncher;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         gym = Gym.instance(this);
+
+        importLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getData() != null) {
+                new ImportIntention(this).importFrom(result.getData().getData());
+            }
+        });
 
         setContentView(R.layout.layout_main);
 
@@ -103,6 +112,8 @@ public class MainActivity extends AbstractActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        requestNotificationPermission();
 
         listener = new Gym.Listener() {
             @Override
@@ -154,7 +165,7 @@ public class MainActivity extends AbstractActivity {
      */
     private boolean checkUsbDevice(Intent intent) {
         if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction())) {
-            UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            UsbDevice device = Compat.usbDeviceExtra(intent);
             if (device != null) {
                 GymService.start(this, device);
 
@@ -163,10 +174,6 @@ public class MainActivity extends AbstractActivity {
                         // views are already created, so switch to workouts
                         pager.setCurrentItem(0, true);
                     }
-                    // try to unlock device - has no effect if this activity is already running :/
-                    getWindow().addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
-                            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
-                            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
                 } else {
                     // program is already selected so restart workout
                     WorkoutActivity.start(this);
@@ -179,6 +186,14 @@ public class MainActivity extends AbstractActivity {
         return false;
     }
 
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 43);
+            }
+        }
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -189,16 +204,6 @@ public class MainActivity extends AbstractActivity {
 
         // consume intent
         intent.setAction(null);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_IMPORT && data != null) {
-            // data intent does not have an action
-            new ImportIntention(this).importFrom(data.getData());
-        }
     }
 
     @Override
@@ -241,7 +246,7 @@ public class MainActivity extends AbstractActivity {
             intent.addCategory(Intent.CATEGORY_OPENABLE);
 
             try {
-                startActivityForResult(Intent.createChooser(intent, getString(R.string.action_import)), REQUEST_IMPORT);
+                importLauncher.launch(Intent.createChooser(intent, getString(R.string.action_import)));
             } catch (android.content.ActivityNotFoundException ex) {
                 Toast.makeText(this, getString(R.string.import_chooser), Toast.LENGTH_LONG).show();
             }

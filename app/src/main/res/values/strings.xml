@@ -149,6 +149,7 @@
 
     <string name="bluetooth_heart">Heart rate sensor</string>
     <string name="bluetooth_heart_no_bluetooth">Bluetooth not available</string>
+    <string name="bluetooth_enable">Please enable Bluetooth</string>
     <string name="bluetooth_heart_no_location">Bluetooth requires enabled location services</string>
     <string name="bluetooth_heart_connecting">Bluetooth connecting to %s</string>
     <string name="bluetooth_heart_failed">Bluetooth connection to %s failed</string>

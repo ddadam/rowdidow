@@ -14,7 +14,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.location.Criteria;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
@@ -137,7 +136,11 @@ public class BluetoothRower extends Rower {
 
 		@Override
 		public void open() {
-			acquirePermissions(Manifest.permission.ACCESS_FINE_LOCATION);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+				acquirePermissions(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT);
+			} else {
+				acquirePermissions(Manifest.permission.ACCESS_FINE_LOCATION);
+			}
 		}
 
 		@Override
@@ -166,7 +169,7 @@ public class BluetoothRower extends Rower {
 
 					IntentFilter filter = new IntentFilter();
 					filter.addAction(LocationManager.MODE_CHANGED_ACTION);
-					context.registerReceiver(this, filter);
+					svenmeier.coxswain.util.Compat.registerReceiver(context, this, filter);
 					registered = true;
 
 					return;
@@ -177,28 +180,28 @@ public class BluetoothRower extends Rower {
 		}
 
 		/**
-		 * Location services must be enabled for Apps built for M and running on M or later.
+		 * Location services must be enabled for BLE scans which can be used
+		 * for location. Not required on API 31+ when BLUETOOTH_SCAN is
+		 * declared with neverForLocation.
 		 */
 		private boolean isRequired() {
-			boolean builtForM = context.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.M;
-			boolean runningOnM = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+				return false;
+			}
 
-			return builtForM && runningOnM;
+			LocationManager manager = (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
+
+			return manager.isProviderEnabled(LocationManager.GPS_PROVIDER) == false
+					&& manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == false
+					&& manager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER) == false;
 		}
 
 		private boolean isEnabled() {
 			LocationManager manager = (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
 
-			Criteria criteria = new Criteria();
-			criteria.setAccuracy(Criteria.ACCURACY_COARSE);
-			criteria.setAltitudeRequired(false);
-			criteria.setBearingRequired(false);
-			criteria.setCostAllowed(true);
-			criteria.setPowerRequirement(Criteria.NO_REQUIREMENT);
-
-			String provider = manager.getBestProvider(criteria, true);
-
-			return provider != null && LocationManager.PASSIVE_PROVIDER.equals(provider) == false;
+			return manager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+					|| manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+					|| manager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER);
 		}
 
 		@Override
@@ -240,12 +243,21 @@ public class BluetoothRower extends Rower {
 
 			IntentFilter filter = new IntentFilter();
 			filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-			filter.addAction(LocationManager.MODE_CHANGED_ACTION);
-			context.registerReceiver(this, filter);
+			svenmeier.coxswain.util.Compat.registerReceiver(context, this, filter);
 			registered = true;
 
-			if (adapter.isEnabled() == false) {
-				adapter.enable();
+			if (isEnabled(adapter)) {
+				proceed();
+			} else if (hasConnectPermission()) {
+				// on Android 13+ enable() is a no-op, the user has to enable
+				// Bluetooth manually; the STATE_ON receiver will proceed then
+				toast(context.getString(R.string.bluetooth_enable));
+
+				try {
+					adapter.enable();
+				} catch (SecurityException noPermission) {
+					// ignored - STATE_ON receiver proceeds once enabled
+				}
 			} else {
 				proceed();
 			}
@@ -292,7 +304,7 @@ public class BluetoothRower extends Rower {
 
 			String name = context.getString(R.string.bluetooth_rower);
 			IntentFilter filter = BluetoothActivity.start(context, name, BlueWriter.SERVICE_FITNESS_MACHINE.toString());
-			context.registerReceiver(this, filter);
+			svenmeier.coxswain.util.Compat.registerReceiver(context, this, filter);
 			registered = true;
 		}
 
@@ -416,7 +428,7 @@ public class BluetoothRower extends Rower {
 				if (connected != null && connected.getDevice().getAddress().equals(address)) {
 					trace.onInput(String.format("rower disconnected %s", address));
 
-					if (adapter.isEnabled()) {
+					if (isEnabled(adapter)) {
 						toast(context.getString(R.string.bluetooth_rower_disconnected, address));
 
 						if (rowerData == null) {
@@ -746,6 +758,21 @@ public class BluetoothRower extends Rower {
 	 *     <li>revisions 1.x jumps back a minute and never recovers</li>
 	 * </ul>
 	 */
+	private boolean hasConnectPermission() {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			return androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+		}
+		return true;
+	}
+
+	private boolean isEnabled(BluetoothAdapter adapter) {
+		try {
+			return adapter.isEnabled();
+		} catch (SecurityException noPermission) {
+			return true;
+		}
+	}
+
 	private int durationDelta(int elapsedTime) {
 		if (elapsedTime == this.previousElapsedTime) {
 			// no change

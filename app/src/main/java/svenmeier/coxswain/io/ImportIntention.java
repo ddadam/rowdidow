@@ -28,7 +28,11 @@ public class ImportIntention {
 		if (Intent.ACTION_VIEW.equals(intent.getAction())) {
 			uri = intent.getData();
 		} else if (Intent.ACTION_SEND.equals(intent.getAction())) {
-			uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+			if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+				uri = intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri.class);
+			} else {
+				uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+			}
 		} else {
 			return false;
 		}

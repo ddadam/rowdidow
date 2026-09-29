@@ -6,9 +6,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.os.Build;
-import android.os.Environment;
 
-import androidx.annotation.RequiresApi;
 import androidx.preference.PreferenceManager;
 
 import java.io.File;
@@ -43,10 +41,11 @@ public class Coxswain extends Application {
 	}
 
 	public static File getExternalFilesDir(Context context) {
-		// for API 29 only possible with android:requestLegacyExternalStorage="true"
-		//
-		// in future we have to use context.getExternalFilesDir(null);
-		return Environment.getExternalStoragePublicDirectory(Coxswain.TAG);
+		File dir = context.getExternalFilesDir(null);
+		if (dir == null) {
+			dir = new File(context.getFilesDir(), Coxswain.TAG);
+		}
+		return dir;
 	}
 
 	@Override
